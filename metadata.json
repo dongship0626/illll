@@ -1,0 +1,5 @@
+{
+  "name": "Gemini Tasks",
+  "description": "A sophisticated task management application with AI-powered task refinement and Supabase persistence.",
+  "requestFramePermissions": []
+}
