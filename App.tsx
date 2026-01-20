@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Todo } from './types';
 import * as db from './supabaseService';
-import { refineTaskDescription } from './geminiService';
 import TodoItem from './components/TodoItem';
-import { Plus, Sparkles, LayoutList, CheckCircle2, ListTodo, Loader2, History } from 'lucide-react';
+import { Plus, LayoutList, CheckCircle2, ListTodo, Loader2, History } from 'lucide-react';
 
 type FilterType = 'active' | 'completed';
 
@@ -13,7 +12,6 @@ const App: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [newTitle, setNewTitle] = useState('');
   const [priority, setPriority] = useState<Todo['priority']>('medium');
-  const [isRefining, setIsRefining] = useState(false);
   const [filter, setFilter] = useState<FilterType>('active');
 
   const loadTodos = async () => {
@@ -22,7 +20,7 @@ const App: React.FC = () => {
       const data = await db.fetchTodos();
       setTodos(data);
     } catch (error) {
-      console.error(error);
+      console.error('Fetch error:', error);
     } finally {
       setLoading(false);
     }
@@ -54,24 +52,20 @@ const App: React.FC = () => {
     e.preventDefault();
     if (!newTitle.trim()) return;
 
-    let description = '';
-    setIsRefining(true);
     try {
-      description = await refineTaskDescription(newTitle);
+      // AI 설명 생성 단계 제거
       const newTodo = await db.createTodo({
         title: newTitle,
         priority,
         is_completed: false,
-        description: description || null
+        description: null // AI 설명 제거됨
       });
       setTodos(prev => [newTodo, ...prev]);
       setNewTitle('');
-      setFilter('active'); // 새 할 일을 추가하면 진행 중 목록으로 이동
+      setFilter('active');
     } catch (error) {
-      console.error(error);
-      alert('Failed to add task.');
-    } finally {
-      setIsRefining(false);
+      console.error('Create error:', error);
+      alert('할 일을 추가하지 못했습니다.');
     }
   };
 
@@ -80,7 +74,7 @@ const App: React.FC = () => {
       const updated = await db.updateTodo(id, { is_completed });
       setTodos(prev => prev.map(t => t.id === id ? updated : t));
     } catch (error) {
-      console.error(error);
+      console.error('Toggle error:', error);
     }
   };
 
@@ -90,7 +84,7 @@ const App: React.FC = () => {
       await db.deleteTodo(id);
       setTodos(prevTodos => prevTodos.filter(todo => todo.id !== id));
     } catch (error) {
-      console.error('Delete failed:', error);
+      console.error('Delete error:', error);
       alert('삭제에 실패했습니다.');
     }
   };
@@ -109,7 +103,7 @@ const App: React.FC = () => {
             <div className="bg-indigo-600 p-2 rounded-lg text-white">
               <LayoutList size={24} />
             </div>
-            <h1 className="text-xl font-bold tracking-tight">Gemini Tasks</h1>
+            <h1 className="text-xl font-bold tracking-tight">Task Manager</h1>
           </div>
           
           <div className="flex bg-slate-100 p-1 rounded-xl">
@@ -132,9 +126,9 @@ const App: React.FC = () => {
       </header>
 
       <main className="max-w-2xl mx-auto px-4 mt-8">
-        {/* Input Area - Only show when in Active filter */}
+        {/* Input Area */}
         {filter === 'active' && (
-          <section className="bg-white p-6 rounded-2xl shadow-sm border mb-8 animate-in fade-in slide-in-from-top-4 duration-500">
+          <section className="bg-white p-6 rounded-2xl shadow-sm border mb-8">
             <form onSubmit={handleAddTodo} className="space-y-4">
               <div className="relative">
                 <input
@@ -142,11 +136,8 @@ const App: React.FC = () => {
                   value={newTitle}
                   onChange={(e) => setNewTitle(e.target.value)}
                   placeholder="무엇을 해야 하나요?"
-                  className="w-full pl-4 pr-12 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all"
+                  className="w-full pl-4 pr-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:outline-none transition-all"
                 />
-                <div className="absolute right-3 top-1/2 -translate-y-1/2 text-indigo-500">
-                  {isRefining ? <Loader2 className="animate-spin" size={20} /> : <Sparkles size={20} />}
-                </div>
               </div>
               
               <div className="flex items-center justify-between gap-4">
@@ -168,7 +159,7 @@ const App: React.FC = () => {
                 </div>
                 <button
                   type="submit"
-                  disabled={!newTitle.trim() || isRefining}
+                  disabled={!newTitle.trim()}
                   className="flex items-center gap-2 bg-indigo-600 text-white px-6 py-2 rounded-xl font-bold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 >
                   <Plus size={20} />
@@ -202,7 +193,7 @@ const App: React.FC = () => {
                 {filter === 'active' ? '할 일이 없습니다' : '완료된 할 일이 없습니다'}
               </h3>
               <p className="text-slate-500 mt-1">
-                {filter === 'active' ? '새로운 할 일을 추가해보세요!' : '오늘 하루도 힘내세요!'}
+                {filter === 'active' ? '새로운 할 일을 추가해보세요!' : '목록이 비어 있습니다.'}
               </p>
             </div>
           ) : (
@@ -221,7 +212,7 @@ const App: React.FC = () => {
       </main>
       
       <footer className="fixed bottom-0 left-0 right-0 bg-white/80 backdrop-blur-md border-t py-3 text-center text-xs text-slate-400 uppercase tracking-widest font-bold">
-        Supabase Cloud & Gemini AI Powered
+        Supabase Cloud Powered
       </footer>
     </div>
   );
